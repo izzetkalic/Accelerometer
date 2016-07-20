@@ -46,3 +46,5 @@ plt.subplot(414)
 plt.plot(p_bench_r)
 plt.title('Partial Range Bench RIGHT Hand')
 plt.legend(handles=[blue_patch,green_patch,red_patch],fontsize='x-small')
+
+fgsdfgsdg
