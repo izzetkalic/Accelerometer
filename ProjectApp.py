@@ -15,7 +15,7 @@ class ProjectApp(tk.Tk):  # The object inside the bracket is basically inherits 
     def __init__(self, *args, **kwargs):
         tk.Tk.__init__(self, *args, **kwargs)
 
-        self.filepaths = []
+        self.filepath = ""
 
         tk.Tk.wm_title(self, "Accelerometer Analysis")
 
@@ -37,14 +37,15 @@ class ProjectApp(tk.Tk):  # The object inside the bracket is basically inherits 
         frame = self.frames[cont]
         frame.tkraise()
 
-    def get_path(self,path):
+    def get_file(self):
 
-        path = path
+        filepath = askopenfilename()
 
-        return path
+        if filepath:
+            self.filepath = filepath
 
 
-class StartPage(tk.Frame, ProjectApp):
+class StartPage(tk.Frame):
 
     def __init__(self, parent, controller, *args, **kwargs):
         tk.Frame.__init__(self, parent, *args, **kwargs)
@@ -54,18 +55,11 @@ class StartPage(tk.Frame, ProjectApp):
         label = tk.Label(self, text="Start Page", font=LARGE_FONT)
         label.pack(pady=10, padx=10)
 
-        btn_getfile = ttk.Button(self, text="File Chooser", command=self.get_file)
+        btn_getfile = ttk.Button(self, text="File Chooser", command=self.controller.get_file)
         btn_getfile.pack()
 
         btn_plotpage = ttk.Button(self, text="Show Plot", command=lambda: controller.show_frame(PlotPage))
         btn_plotpage.pack()
-
-    def get_file(self):
-
-        filepath = askopenfilename()
-
-        if filepath:
-            self.parent.filepaths.append(filepath)
 
 
 class PlotPage(tk.Frame):
@@ -85,8 +79,8 @@ class PlotPage(tk.Frame):
         btn_show.pack()
 
     def show_plot(self):
-
-        data_frame = DataFrame.from_csv(filename)
+        
+        data_frame = DataFrame.from_csv(self.controller.filepath)
 
         f = Figure(figsize=(5, 5), dpi=100)
         a = f.add_subplot(111)
