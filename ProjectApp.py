@@ -168,6 +168,7 @@ class ProjectApp(tk.Tk):  # The object inside the bracket is basically inherits 
                     self.data_frame_segments[which_file].append(periodic)
                     lag += lag_time
 
+
             if is_first:
                 which_file = 0
             else:
