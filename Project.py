@@ -192,6 +192,27 @@ def show_segment_plot(data, periodic_area, exercise_name):
     plt.show()
 
 
+def get_periodic_old(self, data_frame, lookahead, lag_time, set_time, which_file):
+    def get_peaks(data, lookahead):
+        correlation = signal.correlate(data, data, mode='full')
+        realcorr = correlation[correlation.size / 2:]
+        maxpeaks, minpeaks = peakdetect(realcorr, lookahead=lookahead)
+        x, y = zip(*maxpeaks)
+
+        return x
+
+    peak_indexes = get_peaks(data_frame.y, lookahead=lookahead)
+    lag = 0
+    for i in range(0, len(peak_indexes)):
+        time_indexes = data_frame.index.tolist()
+        start_time = time_indexes[0]
+        periodic_start = start_time.to_datetime() + dt.timedelta(seconds=(peak_indexes[i] / 100) - lag)
+        periodic_end = periodic_start + dt.timedelta(seconds=set_time)
+        periodic = data_frame.between_time(periodic_start.time(), periodic_end.time())
+        self.data_frame_segments[which_file].append(periodic)
+        lag += lag_time
+
+
 bench_press_1_week = fbenchL1week.between_time('11:24:30', '11:51:45')
 correlation = signal.correlate(bench_press_1_week.y, bench_press_1_week.y, mode='full')
 realcorr = correlation[correlation.size / 2:]
@@ -201,7 +222,17 @@ signal.correlate(bench_press_1_week.y, bench_press_1_week.y, mode='full')
 
 periodic_area = get_periodic(r'C:\Users\Raven\PycharmProjects\Accelerometer\PA1\Week_1_10x10\Full\fbenchL1week.csv')
 
+from __future__ import division
+import numpy as np
+import matplotlib.pyplot as plt
 
-path = r'C:\Users\Raven\PycharmProjects\Accelerometer\PA1\Week_1_10x10\Partial\fbenchL1week.csv'
-import re
-re.findall(r'\\(.*?).csv',path)
+data = pbenchL1week.between_time('12:45:40', '12:46:00').y
+ps = np.abs(np.fft.fft(data)) ** 2
+
+time_step = 1 / 100
+freqs = np.fft.fftfreq(data.size, time_step)
+idx = np.argsort(freqs)
+
+plt.plot(freqs[idx], ps[idx])
+
+x = fbenchL1week.between_time('11:24:40', '11:24:58').y

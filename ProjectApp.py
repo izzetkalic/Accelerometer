@@ -42,7 +42,8 @@ class ProjectApp(tk.Tk):  # The object inside the bracket is basically inherits 
         self.data_frame_segments = [[], [], False, False]
         self.data_frame_statistics = [[], []]
         self.data_frame_transformed = [[], []]
-        self.column_headers = ["Sets", "Mx", "My", "Mz", "STDx", "STDy", "STDz", "AMP1y", "AMP2y", "AMP3y"]
+        self.column_headers_for_statistics = ["Sets", "Mx", "My", "Mz", "STDx", "STDy", "STDz",
+                                              "FREQ1x", "AMP1x", "FREQ1y", "AMP1y", "FREQ1z", "AMP1z"]
         self.program_path = os.getcwd()
         self.process_counter = 0
         self.allow_thread_3 = True
@@ -258,18 +259,39 @@ class ProjectApp(tk.Tk):  # The object inside the bracket is basically inherits 
 
             def calculate_fft(which_file):
 
-                peaks = []
+                def calculate_fft_for_each_axis(data, axis):
 
-                for i, segment in enumerate(self.data_frame_segments[which_file]):
-                    transformed_data = np.fft.fft(segment.y)
-                    transformed_real = transformed_data[:transformed_data.size / 2]
-                    self.data_frame_transformed[which_file].append(transformed_real)
-                    # TODO mph ve threshold a bak bakalım (, threshold=50)
-                    segment_peaks = detect_peaks(transformed_real, mph=1)
-                    integer_part = transformed_real[segment_peaks[:3]]
-                    peaks.append(int(i) for i in integer_part)
+                    ffts = [[], []]
 
-                return peaks
+                    for i, segment in enumerate(data):
+
+                        fft = np.abs(np.fft.fft(segment[axis]))
+
+                        if fft.size % 2 == 0:
+                            fft_real = fft[:fft.size / 2]
+                        else:
+                            fft_real = fft[:(fft.size + 1) / 2]
+
+                        self.data_frame_transformed[which_file].append(fft_real)
+
+                        # TODO mph ve threshold a bak bakalım (, threshold=50)
+                        fft_peaks = detect_peaks(fft_real, mph=50)
+                        print(fft_peaks)
+                        if not len(fft_peaks) == 0:
+                            ffts[0].append(fft_peaks[0])
+                            ffts[1].append(fft_real[fft_peaks[0]])
+                        else:
+                            ffts[0].insert(i, 0)
+                            ffts[1].insert(i, 0)
+
+                    return ffts
+
+                fftx = calculate_fft_for_each_axis(self.data_frame_segments[which_file], 'x')
+                ffty = calculate_fft_for_each_axis(self.data_frame_segments[which_file], 'y')
+                fftz = calculate_fft_for_each_axis(self.data_frame_segments[which_file], 'z')
+
+                axis_ffts = [fftx, ffty, fftz]
+                return axis_ffts
 
             while self.allow_thread_3:
                 "Waiting"
@@ -278,7 +300,7 @@ class ProjectApp(tk.Tk):  # The object inside the bracket is basically inherits 
             if self.process_counter == 3:
                 time.sleep(3)
                 for which_file in range(0, 2):
-                    powers = calculate_fft(which_file)
+                    ffts = calculate_fft(which_file)
                     for xi, set in enumerate(self.data_frame_segments[which_file]):
                         statistics = []
                         means = np.mean(set)
@@ -287,7 +309,12 @@ class ProjectApp(tk.Tk):  # The object inside the bracket is basically inherits 
                         statistics.insert(0, xi + 1)
                         statistics.extend(means)
                         statistics.extend(stds)
-                        statistics.extend(powers[xi])
+                        statistics.insert(7, ffts[0][0][xi])
+                        statistics.insert(8, ffts[0][1][xi])
+                        statistics.insert(9, ffts[1][0][xi])
+                        statistics.insert(10, ffts[1][1][xi])
+                        statistics.insert(11, ffts[2][0][xi])
+                        statistics.insert(12, ffts[2][1][xi])
 
                         self.data_frame_statistics[which_file].append(statistics)
 
@@ -461,7 +488,7 @@ class ProjectApp(tk.Tk):  # The object inside the bracket is basically inherits 
                 title = self.create_title(file_name)
                 create_segment_plot(self.data_frames_for_analysis[which_file], figure, title, which_file=1)
 
-    def show_transformed(self, is_first):
+    def show_ffts(self, is_first):
 
         if is_first:
             which_file = 0
@@ -469,10 +496,13 @@ class ProjectApp(tk.Tk):  # The object inside the bracket is basically inherits 
             which_file = 1
 
         pyplt.figure(which_file + 1)
-        gs = gridspec.GridSpec(5, 2)
+        title_file = self.create_title(self.file_names[which_file])
+        title_plot = title_file + "Fourier Transformes"
+        pyplt.title(title_plot)
+        gs = gridspec.GridSpec(6, 5)
         k = 0
-        for i in range(0, 5):
-            for j in range(0, 2):
+        for i in range(0, 6):
+            for j in range(0, 5):
                 segment_plot = pyplt.subplot(gs[i, j])
                 segment_plot.plot(self.data_frame_transformed[which_file][k])
                 k += 1
@@ -481,17 +511,19 @@ class ProjectApp(tk.Tk):  # The object inside the bracket is basically inherits 
     def show_statistics(self, is_first):
 
         def _build_tree(tree, which_file):
-            for col in self.column_headers:
+
+            for col in self.column_headers_for_statistics:
                 tree.heading(col, text=col.title())
                 # adjust the column's width to the header string
                 tree.column(col, width=tkFont.Font().measure(col.title()))
             for set in self.data_frame_statistics[which_file]:
-                tree.insert('', 'end', values=set)
+                rounded = [round(elem, 4) for elem in set]
+                tree.insert('', 'end', values=rounded)
                 # adjust column's width if necessary to fit each value
-                for ix, val in enumerate(set):
+                for ix, val in enumerate(rounded):
                     col_w = tkFont.Font().measure(str(val))
-                    if tree.column(self.column_headers[ix], width=None) < col_w:
-                        tree.column(self.column_headers[ix], width=col_w - 50)
+                    if tree.column(self.column_headers_for_statistics[ix], width=None) < col_w:
+                        tree.column(self.column_headers_for_statistics[ix], width=col_w)
 
         if is_first:
             which_file = 0
@@ -510,7 +542,7 @@ class ProjectApp(tk.Tk):  # The object inside the bracket is basically inherits 
         container = ttk.Frame(outer_frame)
         container.pack(fill='both', expand=True)
 
-        statistics_tree = ttk.Treeview(container, columns=self.column_headers, show="headings")
+        statistics_tree = ttk.Treeview(container, columns=self.column_headers_for_statistics, show="headings")
         vsb = ttk.Scrollbar(container, orient="vertical", command=statistics_tree.yview)
         hsb = ttk.Scrollbar(container, orient="horizontal", command=statistics_tree.xview)
         statistics_tree.configure(yscrollcommand=vsb.set, xscrollcommand=hsb.set)
@@ -685,7 +717,7 @@ class AnalysisPage(tk.Frame):
         btn_statistics_first.grid(row=3, column=0, columnspan=2, sticky='ew')
 
         btn_show_transformed_first = ttk.Button(left_frame, text='Show Transformed',
-                                                command=lambda: controller.show_transformed(True))
+                                                command=lambda: controller.show_ffts(True))
         btn_show_transformed_first.grid(row=4, column=0, columnspan=2, sticky='ew')
 
         label_second = ttk.Label(right_frame, text="For Second Dataset", font=LARGE_FONT)
@@ -705,7 +737,7 @@ class AnalysisPage(tk.Frame):
         btn_statistics_second.grid(row=3, column=0, columnspan=2, sticky='ew')
 
         btn_show_transformed_second = ttk.Button(right_frame, text='Show Transformed',
-                                                 command=lambda: controller.show_transformed(False))
+                                                 command=lambda: controller.show_ffts(False))
         btn_show_transformed_second.grid(row=4, column=0, columnspan=2, sticky='ew')
 
         btn_compare = ttk.Button(bottom_frame, text="Compare")
