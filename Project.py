@@ -236,3 +236,9 @@ idx = np.argsort(freqs)
 plt.plot(freqs[idx], ps[idx])
 
 x = fbenchL1week.between_time('11:24:40', '11:24:58').y
+
+y=[]
+try:
+    y[0]=0
+except IndexError:
+    print("merhaba")
