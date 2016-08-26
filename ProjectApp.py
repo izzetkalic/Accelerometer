@@ -179,7 +179,7 @@ class ProjectApp(tk.Tk):  # The object inside the bracket is basically inherits 
                     frame_filter.grid(row=1, column=0, sticky='ew', padx=15, pady=15)
 
                     label_order = ttk.Label(frame_filter, text="Filter Order: ")
-                    label_order.grid(row=1, column=0, padx=3)
+                    label_order.grid(row=1, column=0, padx=3,sticky='w')
 
                     entry_order = ttk.Entry(frame_filter)
                     entry_order.grid(row=1, column=1, padx=3, pady=3)
@@ -212,7 +212,7 @@ class ProjectApp(tk.Tk):  # The object inside the bracket is basically inherits 
                     btn_sampling_freq.grid(row=3, column=2)
 
                     label_butter_type = ttk.Label(frame_filter, text="Butter Type: ")
-                    label_butter_type.grid(row=4, column=0, padx=3)
+                    label_butter_type.grid(row=4, column=0, padx=3,sticky='w')
 
                     entry_butter_type = ttk.Entry(frame_filter)
                     entry_butter_type.grid(row=4, column=1, padx=3, pady=3)
