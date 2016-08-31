@@ -66,17 +66,19 @@ class ProjectApp(tk.Tk):  # The object inside the bracket is basically inherits 
         self.data_frame_parameters[which_file][2]: End Time of Exercise
         self.data_frame_parameters[which_file][3]: Set Time of Exercise
         self.data_frame_parameters[which_file][4]: Rest Time of Exercise
-        self.data_frame_parameters[which_file][5]: Treshold for Segmentation
+        self.data_frame_parameters[which_file][5]: Threshold for Segmentation
         self.data_frame_parameters[which_file][6]: Lag Time
         self.data_frame_parameters[which_file][7]: User's Intend of Filtering
         self.data_frame_parameters[which_file][8]: Order of Filter
-        self.data_frame_parameters[which_file][9]: Wn
-        self.data_frame_parameters[which_file][10]: Butter Filter Type
+        self.data_frame_parameters[which_file][9]: Cutoff Frequency
+        self.data_frame_parameters[which_file][10]: Sampling Frequency
+        self.data_frame_parameters[which_file][11]: Butter Filter Type
         """
         self.process_counter = 0
         self.threads = []
         self.index_error = 0
         self.allow_thread_3 = True
+        self.gif_animate = True
         self.column_headers_for_statistics = ["Set", "Rep", "Hand", "EType", "Mx", "My", "Mz", "STDx", "STDy", "STDz",
                                               "FREQ1x", "POW1x", "FREQ1y", "POW1y", "FREQ1z", "POW1z"]
 
@@ -179,7 +181,7 @@ class ProjectApp(tk.Tk):  # The object inside the bracket is basically inherits 
                     frame_filter.grid(row=1, column=0, sticky='ew', padx=15, pady=15)
 
                     label_order = ttk.Label(frame_filter, text="Filter Order: ")
-                    label_order.grid(row=1, column=0, padx=3,sticky='w')
+                    label_order.grid(row=1, column=0, padx=3, sticky='w')
 
                     entry_order = ttk.Entry(frame_filter)
                     entry_order.grid(row=1, column=1, padx=3, pady=3)
@@ -212,7 +214,7 @@ class ProjectApp(tk.Tk):  # The object inside the bracket is basically inherits 
                     btn_sampling_freq.grid(row=3, column=2)
 
                     label_butter_type = ttk.Label(frame_filter, text="Butter Type: ")
-                    label_butter_type.grid(row=4, column=0, padx=3,sticky='w')
+                    label_butter_type.grid(row=4, column=0, padx=3, sticky='w')
 
                     entry_butter_type = ttk.Entry(frame_filter)
                     entry_butter_type.grid(row=4, column=1, padx=3, pady=3)
@@ -303,7 +305,7 @@ class ProjectApp(tk.Tk):  # The object inside the bracket is basically inherits 
             entry_rest_time = ttk.Entry(param_frame)
             entry_rest_time.grid(row=3, column=1, sticky='w', padx=3, pady=3)
 
-            label_treshold = ttk.Label(param_frame, text='Treshold:')
+            label_treshold = ttk.Label(param_frame, text='Threshold:')
             label_treshold.grid(row=4, column=0, sticky='w')
 
             entry_treshold = ttk.Entry(param_frame)
@@ -419,6 +421,7 @@ class ProjectApp(tk.Tk):  # The object inside the bracket is basically inherits 
             tree.heading(col, text=col.title())
             # adjust the column's width to the header string
             tree.column(col, width=font.Font().measure(col.title()))
+
         if which_file == 0:
             data = data_frame[:100]
         elif which_file == 1:
@@ -442,35 +445,35 @@ class ProjectApp(tk.Tk):  # The object inside the bracket is basically inherits 
                 if tree.column(data_frame.columns[ix], width=None) < col_w:
                     tree.column(data_frame.columns[ix], width=col_w)
 
-    def start_analysis(self, label_waiting):
+    def write_params_to_file(self):
 
-        def write_params_to_file():
+        if (len(self.data_frame_parameters[0]) == 0) | (len(self.data_frame_parameters[1]) == 0):
+            self.show_message("Please fill parameters")
+        else:
 
-            if (len(self.data_frame_parameters[0]) == 0) | (len(self.data_frame_parameters[1]) == 0):
-                self.show_message("Please fill parameters")
+            if len(self.whole_file) == 0:
+                self.whole_file.append(self.data_frame_parameters[0])
+                self.whole_file.append(self.data_frame_parameters[1])
             else:
+                for which_file in range(0, 2):
 
-                if len(self.whole_file) == 0:
-                    self.whole_file.append(self.data_frame_parameters[0])
-                    self.whole_file.append(self.data_frame_parameters[1])
-                else:
-                    for which_file in range(0, 2):
+                    cond = [True for elem in self.whole_file if
+                            elem[0] == self.data_frame_parameters[which_file][0]]
 
-                        cond = [True for elem in self.whole_file if
-                                elem[0] == self.data_frame_parameters[which_file][0]]
+                    if not cond:
+                        self.whole_file.append(self.data_frame_parameters[which_file])
+                    else:
+                        for i, elem in enumerate(self.whole_file):
+                            if elem[0] == self.data_frame_parameters[which_file][0]:
+                                self.whole_file[i] = self.data_frame_parameters[which_file]
 
-                        if not cond:
-                            self.whole_file.append(self.data_frame_parameters[which_file])
-                        else:
-                            for i, elem in enumerate(self.whole_file):
-                                if elem[0] == self.data_frame_parameters[which_file][0]:
-                                    self.whole_file[i] = self.data_frame_parameters[which_file]
+            with open('remember.csv', 'w') as remember:
+                writer = csv.writer(remember, delimiter=',')
+                for elem in self.whole_file:
+                    writer.writerow(elem)
+            remember.close()
 
-                with open('remember.csv', 'w') as remember:
-                    writer = csv.writer(remember, delimiter=',')
-                    for elem in self.whole_file:
-                        writer.writerow(elem)
-                remember.close()
+    def start_analysis(self, label_waiting):
 
         def segment_data(is_first):
 
@@ -523,7 +526,6 @@ class ProjectApp(tk.Tk):  # The object inside the bracket is basically inherits 
             start_time = time_indexes[0]
             data_frame = self.data_frames_for_analysis[which_file]
             cut_points = get_cut_points(filtered_data, float(params[5]), float(params[3]), float(params[4]))
-
             try:
                 lag = 0
                 for i in range(0, 10):
@@ -584,7 +586,6 @@ class ProjectApp(tk.Tk):  # The object inside the bracket is basically inherits 
             data = []
             for which_file in range(0, 2):
                 for xi, segment in enumerate(self.data_frame_segments[which_file]):
-
                     partitions = []
                     partition_time = float(self.data_frame_parameters[which_file][3]) / 10
                     time_indexes = segment.index.tolist()
@@ -650,7 +651,7 @@ class ProjectApp(tk.Tk):  # The object inside the bracket is basically inherits 
         elif not self.data_frames[3]:
             self.show_message('Please choose second file')
         else:
-            write_params_to_file()
+            self.write_params_to_file()
 
             self.data_frames_for_analysis[0] = self.data_frames[0].between_time(self.data_frame_parameters[0][1],
                                                                                 self.data_frame_parameters[0][2])
@@ -691,14 +692,29 @@ class ProjectApp(tk.Tk):  # The object inside the bracket is basically inherits 
         elif file_name.__contains__('R'):
             content.append('Right Hand')
 
-        if file_name.__contains__('1'):
-            content.append('1 Week Data')
-        elif file_name.__contains__('2'):
-            content.append('2 Week Data')
-        else:
-            content.append('Data')
+        for i in range(1, 100):
+            if file_name.__contains__(str(i)):
+                if i == 1:
+                    content.append(str(i) + "st")
+                elif i == 2:
+                    content.append(str(i) + "nd")
+                elif i == 3:
+                    content.append(str(i) + "rd")
+                else:
+                    content.append(str(i) + "st")
 
-        title = "{} {} {} {}".format(content[0], content[1], content[2], content[3])
+        times = ["day", "week", "month", "year"]
+
+        if file_name.__contains__(times[0]):
+            content.append('Day Data')
+        elif file_name.__contains__(times[1]):
+            content.append('Week Data')
+        elif file_name.__contains__(times[2]):
+            content.append('Month Data')
+        elif file_name.__contains__(times[3]):
+            content.append("Year Data")
+
+        title = "{} {} {} {} {}".format(content[0], content[1], content[2], content[3], content[4])
 
         return title
 
@@ -811,40 +827,164 @@ class ProjectApp(tk.Tk):  # The object inside the bracket is basically inherits 
 
     def compare_data(self):
 
-        def compare(compare_by):
+        def compare(compare_by, max_depth=None, min_samples_leaf=1):
 
             data = self.data_frame_statistics
             training_set = data.sample(frac=0.8)
             test_set = data[~(data.isin(training_set)).all(1)]
 
-            comp = ["", ""]
+            comp = ["", "", ""]
             if compare_by == "range":
                 comp[0] = 'EType'
                 comp[1] = 'Full Range'
+                comp[2] = 'Partial Range'
             else:
                 comp[0] = 'Hand'
                 comp[1] = 'Left'
+                comp[2] = 'Right'
 
             label = []
             for index, row in training_set.iterrows():
                 if row[comp[0]] == comp[1]:
-                    label.insert(len(label), 0)
+                    label.insert(len(label), comp[1])
                 else:
-                    label.insert(len(label), 1)
+                    label.insert(len(label), comp[2])
 
-            comp_data = {'training': training_set[training_set.columns[5:]].values,
-                         'test': test_set[test_set.columns[5:]].values,
-                         'label': label}
+            if compare_by == "range":
+                comp_data = {'training': training_set[training_set.columns[4:]].values,
+                             'test': test_set[test_set.columns[4:]].values,
+                             'label': label}
+            else:
+                comp_data = {'training': training_set[training_set.columns[5:]].values,
+                             'test': test_set[test_set.columns[5:]].values,
+                             'label': label}
+
             comp_data = DotDict(comp_data)
 
-            clf = tree.DecisionTreeClassifier()
+            clf = tree.DecisionTreeClassifier(min_samples_leaf=min_samples_leaf, max_depth=max_depth)
             clf = clf.fit(comp_data.training, comp_data.label)
 
             y_pred = clf.predict(comp_data.test)
 
             return training_set, test_set, y_pred, clf
 
-        def summary_asper_compairing(compare_by, test, summary, classifier):
+        def run_test(compare_by, max_leaf, increment_leaf, max_depth, increment_depth, repetition):
+
+            def animate(label):
+                gif_index = 0
+                while self.gif_animate:
+                    try:
+                        time.sleep(0.2)
+
+                        self.loader.config(format="gif - {}".format(gif_index))
+                        label.config(image=self.loader)
+                        label.image = self.loader
+
+                        gif_index += 1
+
+                    except:
+                        gif_index = 0
+                label.config(image='')
+
+            def test_classifier(compare_by, max_leaf, increment_leaf, max_depth, increment_depth, repetition,
+                                thread_animate):
+
+                self.gif_animate = True
+                thread_animate.start()
+
+                test_result = []
+                for leaf in range(1, max_leaf + 1, increment_leaf):
+                    for depth in range(1, max_depth + 1, increment_depth):
+
+                        result = 0
+                        for rep in range(0, repetition):
+
+                            _, test, y_pred, _ = compare(compare_by, max_depth=depth, min_samples_leaf=leaf)
+
+                            if compare_by == "range":
+                                error_full = 0
+                                error_partial = 0
+                                for i in range(0, len(test)):
+                                    if test["EType"].values[i] == "Full Range":
+                                        if not test["EType"].values[i] == y_pred[i]:
+                                            error_full += 1
+                                    else:
+                                        if not test["EType"].values[i] == y_pred[i]:
+                                            error_partial += 1
+                                result += (error_full + error_partial) / len(test)
+                            else:
+                                error_left = 0
+                                error_right = 0
+                                for i in range(0, len(test)):
+                                    if test["Hand"].values[i] == "Left":
+                                        if not test["Hand"].values[i] == y_pred[i]:
+                                            error_left += 1
+                                    else:
+                                        if not test["Hand"].values[i] == y_pred[i]:
+                                            error_right += 1
+                                result += (error_left + error_right) / len(test)
+
+                        test_result.append([int(leaf), int(depth), 1 - result / repetition])
+
+                test_result = np.array(test_result)
+                column_for_test = ["Min Samples Leaf", "Max Depth", "Success Rate"]
+                test_result_df = DataFrame(data=test_result, columns=column_for_test)
+
+                self.gif_animate = False
+
+                window = tk.Toplevel(self)
+                outer_frame = ttk.Frame(window)
+                outer_frame.pack(fill='both', expand=True, padx=15, pady=15)
+
+                customFont = font.Font(family="Courier", size=8)
+
+                line1_header = "{} {} {}".format(" Total repetition :", repetition, "\n")
+                line2_header = "{} {} {}".format("Number of sample for each repetition:", len(test), "(%80 of total)\n")
+
+                lines_header = "{} {}".format(line1_header, line2_header)
+
+                label_header = ttk.Label(outer_frame, text=lines_header, justify="left", font=customFont)
+                label_header.pack(fill="both")
+
+                container_for_class_test = ttk.Frame(outer_frame, relief='groove')
+                container_for_class_test.pack(fill="both", expand=True)
+
+                tree_for_class_test = ttk.Treeview(container_for_class_test, columns=column_for_test, show="headings")
+                vsb_for_class_test = ttk.Scrollbar(container_for_class_test, orient="vertical",
+                                                   command=tree_for_class_test.yview)
+                hsb_for_class_test = ttk.Scrollbar(container_for_class_test, orient="horizontal",
+                                                   command=tree_for_class_test.xview)
+                tree_for_class_test.configure(yscrollcommand=vsb_for_class_test.set,
+                                              xscrollcommand=hsb_for_class_test.set)
+                tree_for_class_test.grid(column=0, row=0, sticky='nsew')
+                vsb_for_class_test.grid(column=1, row=0, sticky='ns')
+                hsb_for_class_test.grid(column=0, row=1, sticky='ew')
+
+                container_for_class_test.grid_columnconfigure(0, weight=1)
+                container_for_class_test.grid_rowconfigure(0, weight=1)
+
+                self.build_tree(tree_for_class_test, test_result_df, 2)
+
+                optimum_values = test_result_df.loc[
+                    test_result_df["Success Rate"] == max(test_result_df["Success Rate"])].values
+
+                line1_result = "Optimum Values\n"
+                line2_result = "{} {} {}".format("Minimum Leaf Samples: ", int(optimum_values[0][0]), "\n")
+                line3_result = "{} {} {}".format("Max Tree Depth      : ", int(optimum_values[0][1]), "\n")
+                line4_result = "{} {} {}".format("Success Rate        : ", round(optimum_values[0][2], 4), "\n")
+
+                lines_result = "{} {} {} {}".format(line1_result, line2_result, line3_result, line4_result)
+
+                label_result = ttk.Label(outer_frame, text=lines_result, justify="left", font=customFont)
+                label_result.pack(fill="both")
+
+            thread_animate = Thread(target=animate, args=([label_animate]))
+            thread_test = Thread(target=test_classifier, args=(
+            compare_by, max_leaf, increment_leaf, max_depth, increment_depth, repetition, thread_animate))
+
+            thread_test.start()
+
+        def create_summary(compare_by, test, summary, classifier):
 
             if compare_by == "range":
                 real_full = sum(test["EType"] == "Full Range")
@@ -862,13 +1002,14 @@ class ProjectApp(tk.Tk):  # The object inside the bracket is basically inherits 
 
                 line1 = "{} {} {} {}".format(len(test), " out of ", len(self.data_frame_statistics),
                                              " has taken as samples\n")
-                line2 = "{} {} {}".format("Number of full range samples    = ", real_full, "\n")
-                line3 = "{} {} {}".format("Number of partial range samples = ", real_partial, "\n")
-                line4 = "{} {} {} {}".format(error_full, " out of ", real_full,
+                line2 = "%80 of total data taken as test set\n"
+                line3 = "{} {} {}".format("Number of full range samples = ", real_full, "\n")
+                line4 = "{} {} {}".format("Number of partial range samples = ", real_partial, "\n")
+                line5 = "{} {} {} {}".format(error_full, " out of ", real_full,
                                              " Full Range exercise recognised as Partial Range\n")
-                line5 = "{} {} {} {}".format(error_partial, " out of ", real_partial,
+                line6 = "{} {} {} {}".format(error_partial, " out of ", real_partial,
                                              " Partial Range exercise recognised as Full Range\n")
-                line6 = "{} {} {}".format("Max depth of tree: ", classifier.tree_.max_depth, "\n")
+                line7 = "{} {} {}".format("Max depth of tree: ", classifier.tree_.max_depth, "\n")
             else:
                 real_left = sum(test["Hand"] == "Left")
                 real_right = sum(test["Hand"] == "Right")
@@ -885,15 +1026,16 @@ class ProjectApp(tk.Tk):  # The object inside the bracket is basically inherits 
 
                 line1 = "{} {} {} {}".format(len(test), " out of ", len(self.data_frame_statistics),
                                              " has taken as samples\n")
-                line2 = "{} {} {}".format("Number of left hand samples    = ", real_left, "\n")
-                line3 = "{} {} {}".format("Number of right samples = ", real_right, "\n")
-                line4 = "{} {} {} {}".format(error_left, " out of ", real_left,
+                line2 = "%80 of total data taken as test set\n"
+                line3 = "{} {} {}".format("Number of left hand samples = ", real_left, "\n")
+                line4 = "{} {} {}".format("Number of right hand samples = ", real_right, "\n")
+                line5 = "{} {} {} {}".format(error_left, " out of ", real_left,
                                              " Left Hand recognised as Right Hand\n")
-                line5 = "{} {} {} {}".format(error_right, " out of ", real_right,
+                line6 = "{} {} {} {}".format(error_right, " out of ", real_right,
                                              " Right Hand recognised as Left Hand\n")
-                line6 = "{} {} {}".format("Max depth of tree: ", classifier.tree_.max_depth, "\n")
+                line7 = "{} {} {}".format("Max depth of tree: ", classifier.tree_.max_depth, "\n")
 
-            lines = [line1, line2, line3, line4, line5, line6]
+            lines = [line1, line2, line3, line4, line5, line6, line7]
 
             return lines
 
@@ -985,23 +1127,11 @@ class ProjectApp(tk.Tk):  # The object inside the bracket is basically inherits 
         if compare_by == "range":
             summary["Exercise Type"] = test["EType"]
             column_for_summary = ["Set", "Repetition", "Exercise Type", "Recognise As"]
-            result = []
-            for i, pred in enumerate(y_pred):
-                if pred == 0:
-                    result.insert(len(result), "Full Range")
-                else:
-                    result.insert(len(result), "Partial Range")
         else:
             summary["Hand Type"] = test["Hand"]
             column_for_summary = ["Set", "Repetition", "Hand Type", "Recognise As"]
-            result = []
-            for i, pred in enumerate(y_pred):
-                if pred == 0:
-                    result.insert(len(result), "Left")
-                else:
-                    result.insert(len(result), "Right")
 
-        summary["Recognise As"] = result
+        summary["Recognise As"] = y_pred
 
         window = tk.Toplevel(self)
         window.resizable(False, False)
@@ -1013,7 +1143,7 @@ class ProjectApp(tk.Tk):  # The object inside the bracket is basically inherits 
         label_summary_header.pack(side="top", fill="both", padx=10, pady=10)
 
         container_for_summary = ttk.Frame(frame_top, relief='groove')
-        container_for_summary.pack(fill="both", expand=True)
+        container_for_summary.pack(side="left", padx=5)
 
         tree_for_summary = ttk.Treeview(container_for_summary, columns=column_for_summary, show="headings")
         vsb_for_summary = ttk.Scrollbar(container_for_summary, orient="vertical", command=tree_for_summary.yview)
@@ -1026,31 +1156,117 @@ class ProjectApp(tk.Tk):  # The object inside the bracket is basically inherits 
         container_for_summary.grid_columnconfigure(0, weight=1)
         container_for_summary.grid_rowconfigure(0, weight=1)
 
-        line = summary_asper_compairing(compare_by, test, summary, classifier)
+        self.build_tree(tree_for_summary, summary, 2)
 
-        text = "{} {} {} {} {} {}".format(line[0], line[1], line[2], line[3], line[4], line[5])
+        data_feature = DataFrame()
+        column_for_feature = ["Features", "Importance(Gini)"]
+        if compare_by == "range":
+            features = ["Mean-X", "Mean-Y", "Mean-Z", "Std-X", "Std-Y", "Std-Z", "Frequency-X", "Power-X",
+                        "Frequency-Y", "Power-Y", "Frequency-Z", "Power-Z"]
+        else:
+            features = ["Mean-Y", "Mean-Z", "Std-X", "Std-Y", "Std-Z", "Frequency-X", "Power-X",
+                        "Frequency-Y", "Power-Y", "Frequency-Z", "Power-Z"]
+        data = classifier.feature_importances_
+        data_feature["Features"] = features
+        data_feature["Importance(Gini)"] = data
 
-        frame_label = ttk.Frame(window)
-        frame_label.pack(fill='both', expand=True, pady=5, padx=10)
+        container_for_features = ttk.Frame(frame_top, relief='groove')
+        container_for_features.pack(side="left", expand=True, fill="both")
+
+        tree_for_features = ttk.Treeview(container_for_features, columns=column_for_feature, show="headings")
+        vsb_for_features = ttk.Scrollbar(container_for_features, orient="vertical", command=tree_for_features.yview)
+        hsb_for_features = ttk.Scrollbar(container_for_features, orient="horizontal", command=tree_for_features.xview)
+        tree_for_features.configure(yscrollcommand=vsb_for_features.set, xscrollcommand=hsb_for_features.set)
+        tree_for_features.grid(column=0, row=0, sticky='nsew')
+        vsb_for_features.grid(column=1, row=0, sticky='ns')
+        hsb_for_features.grid(column=0, row=1, sticky='ew')
+
+        container_for_features.grid_columnconfigure(0, weight=1)
+        container_for_features.grid_rowconfigure(0, weight=1)
+
+        self.build_tree(tree_for_features, data_feature.sort_values(by="Importance(Gini)", ascending=False), 2)
+
+        line = create_summary(compare_by, test, summary, classifier)
+
+        text = "{} {} {} {} {} {} {}".format(line[0], line[1], line[2], line[3], line[4], line[5], line[6])
+
+        frame_bottom = ttk.Frame(window)
+        frame_bottom.pack(fill="both")
+
+        frame_label = ttk.Frame(frame_bottom)
+        frame_label.grid(row=0, column=0, sticky="n", padx=5)
 
         label_header = tk.Label(frame_label, text="Summary", font=LARGE_FONT, justify="center")
-        label_header.pack(fill='both', expand=True)
+        label_header.pack(fill='both', expand=True, pady=5)
 
         label_summary_result = tk.Label(frame_label, text=text, justify='left')
         label_summary_result.pack(side="left", fill='both', expand=False)
 
-        frame_button = ttk.Frame(window)
-        frame_button.pack(expand=True, padx=10, pady=10)
+        frame_button = ttk.Frame(frame_bottom)
+        frame_button.grid(row=1, column=0, pady=10)
 
         btn_show_training = ttk.Button(frame_button, text="Show Traning Set",
                                        command=lambda: show_training_set(training))
-        btn_show_training.grid(column=0, row=0, sticky='ew')
+        btn_show_training.pack(side="left")
 
         btn_show_test = ttk.Button(frame_button, text="Show Test Set",
                                    command=lambda: show_test_set(test))
-        btn_show_test.grid(column=1, row=0, sticky='ew')
+        btn_show_test.pack(side="left")
 
-        self.build_tree(tree_for_summary, summary, 2)
+        frame_label_entry = ttk.Frame(frame_bottom)
+        frame_label_entry.grid(row=0, column=1, sticky="n", padx=5)
+
+        label_header_test = ttk.Label(frame_label_entry, text="Simulate Decision Tree", font=LARGE_FONT)
+        label_header_test.grid(row=0, column=0, columnspan=2, pady=5)
+
+        frame_labels = ttk.Frame(frame_label_entry)
+        frame_labels.grid(row=1, column=0, sticky="ew")
+
+        label_rep = ttk.Label(frame_labels, text="Number of Repetition : ")
+        label_rep.grid(row=0, column=0, sticky="w")
+
+        label_leaf = ttk.Label(frame_labels, text="Min Samples For Leaf / Increment : ")
+        label_leaf.grid(row=1, column=0, sticky="w")
+
+        label_depth = ttk.Label(frame_labels, text="Max Depth For Tree / Increment : ")
+        label_depth.grid(row=2, column=0, sticky="w")
+
+        frame_entries = ttk.Frame(frame_label_entry)
+        frame_entries.grid(row=1, column=1, sticky="ew")
+
+        entry_rep = ttk.Entry(frame_entries)
+        entry_rep.grid(row=0, column=0)
+        entry_rep.insert(0, 10)
+
+        entry_min_leaf = ttk.Entry(frame_entries)
+        entry_min_leaf.grid(row=1, column=0)
+        entry_min_leaf.insert(0, 5)
+
+        entry_inc_leaf = ttk.Entry(frame_entries)
+        entry_inc_leaf.grid(row=1, column=1)
+        entry_inc_leaf.insert(0, 1)
+
+        entry_max_depth = ttk.Entry(frame_entries)
+        entry_max_depth.grid(row=2, column=0)
+        entry_max_depth.insert(0, 5)
+
+        entry_inc_depth = ttk.Entry(frame_entries)
+        entry_inc_depth.grid(row=2, column=1)
+        entry_inc_depth.insert(0, 1)
+
+        frame_button2 = ttk.Frame(frame_bottom)
+        frame_button2.grid(row=1, column=1, pady=10)
+
+        label_animate = ttk.Label(frame_button2)
+
+        btn_show_class_test = ttk.Button(frame_button2, text="Simulate",
+                                         command=lambda: run_test(compare_by, int(entry_min_leaf.get()),
+                                                                  int(entry_inc_leaf.get()),
+                                                                  int(entry_max_depth.get()),
+                                                                  int(entry_inc_depth.get()),
+                                                                  int(entry_rep.get())))
+        btn_show_class_test.pack(side="left")
+        label_animate.pack(side="left")
 
 
 class DotDict(dict):
