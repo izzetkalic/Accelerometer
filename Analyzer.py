@@ -4,6 +4,7 @@ import os
 import sys
 import time
 import tkinter as tk
+import ttk
 import tkinter.font as font
 from threading import Thread
 from tkinter import ttk
